@@ -1,0 +1,177 @@
+Table WeightCategory {
+    id uuid [pk]
+    name text [not null, unique]
+    max_weight_kg decimal(6, 3) [not null, unique, check: `max_weight_kg > 0 and max_weight_kg <= 120.202`]
+    max_weight_lbs int [not null, unique, check: `max_weight_lbs > 0 and max_weight_lbs <= 265`]
+}
+
+
+Table Fighter {
+    id uuid [pk]
+    firstname text [not null]
+    lastname text [not null]
+    birthday date [not null]
+    height int [not null, check: `height > 0`, note: "centimeters"]
+    reach_cm int [check: `reach_cm > 0`, note: "wingspan, centimeters"]
+    stance text [check: `stance is null or stance in ('Orthodox', 'Southpaw', 'Switch')`]
+    weight_category_id uuid [not null]
+    rating int [
+        check: `rating is null or (rating >= 0 and rating <=15)`,
+        note: "top 15; 0 - champion; null - not in rating"
+    ]
+    is_active bool [not null]
+    wins int [not null, check: `wins >= 0`, default: 0]
+    losses int [not null, check: `losses >= 0`, default: 0]
+    draws int [not null, check: `draws >= 0`, default: 0]
+    no_contests int [not null, check: `no_contests >= 0`, default: 0]
+    knockouts int [not null, check: `knockouts >= 0 and knockouts <= wins`, default: 0]
+    submissions int [not null, check: `submissions >= 0 and submissions <= wins`, default: 0]
+    decisions int [not null, check: `decisions >= 0 and decisions <= wins`, default: 0]
+    slpm decimal(4,2) [check: `slpm >= 0`, note: "significant strikes landed per minute"]
+    striking_accuracy decimal(5,2) [check: `striking_accuracy >= 0 and striking_accuracy <= 100`, note: "percent"]
+    sapm decimal(4,2) [check: `sapm >= 0`, note: "significant strikes absorbed per minute"]
+    striking_defense decimal(5,2) [check: `striking_defense >= 0 and striking_defense <= 100`, note: "percent"]
+    takedown_avg decimal(4,2) [check: `takedown_avg >= 0`, note: "takedowns landed per 15 minutes"]
+    takedown_accuracy decimal(5,2) [check: `takedown_accuracy >= 0 and takedown_accuracy <= 100`, note: "percent"]
+    takedown_defense decimal(5,2) [check: `takedown_defense >= 0 and takedown_defense <= 100`, note: "percent"]
+    submission_avg decimal(4,2) [check: `submission_avg >= 0`, note: "submission attempts per 15 minutes"]
+    indexes {
+        (weight_category_id, rating) [unique]
+    }
+}
+Ref: Fighter.weight_category_id > WeightCategory.id [delete: restrict]
+
+
+Table Venue {
+    id uuid [pk]
+    name text [not null]
+    address text [not null, unique]
+    latitude decimal(9,6) [not null]
+    longitude decimal(9,6) [not null]
+    city text [not null]
+    country text [not null]
+    capacity int [not null, check: `capacity > 0`]
+    rental_cost decimal(12, 2) [not null, check: `rental_cost >= 0`]
+    indexes {
+        (latitude, longitude) [unique]
+    } 
+}
+
+
+Table Event {
+    id uuid [pk]
+    name text [not null, unique]
+    venue_id uuid [not null]
+    date_event date [not null]
+    revenue decimal(12, 2) [not null, check: `revenue >= 0`]
+    expenses decimal(12, 2) [not null, check: `expenses >= 0`]
+    profit decimal(12, 2) [note: "profit = revenue - expenses, virtual"]
+    attendance int [not null, check: `attendance >= 0`]    
+}
+Ref: Event.venue_id > Venue.id [delete: restrict]
+
+
+Table Referee {
+    id uuid [pk]
+    firstname text [not null]
+    lastname text [not null]
+    athletic_commission text [not null]
+}
+
+
+Table Judge {
+    id uuid [pk]
+    firstname text [not null]
+    lastname text [not null]    
+}
+
+
+Enum WinWay {
+    decision
+    submission
+    KO
+    TKO
+    opponent_disqualification
+    draw
+    no_contest    
+}
+
+
+Table Fight {
+    id uuid [pk]
+    event_id uuid [not null]
+    red_corner_fighter_id uuid [not null, check: `red_corner_fighter_id != blue_corner_fighter_id`]
+    blue_corner_fighter_id uuid [not null]
+    referee_id uuid [not null]
+    round_cnt int [not null, check: `round_cnt = 3 or round_cnt = 5`]
+    winner_id uuid [check: `winner_id is null or winner_id = red_corner_fighter_id or winner_id = blue_corner_fighter_id`]
+    way WinWay [not null]
+    title_fight bool [not null]
+    end_time interval [not null]
+    last_round int [not null, check: `last_round >= 1 and last_round <= round_cnt`]
+}
+Ref: Fight.red_corner_fighter_id > Fighter.id [delete: restrict]
+Ref: Fight.blue_corner_fighter_id > Fighter.id [delete: restrict]
+Ref: Fight.winner_id >? Fighter.id [delete: restrict]
+Ref: Fight.referee_id > Referee.id [delete: restrict]
+Ref: Fight.event_id > Event.id [delete: restrict]
+
+
+Table Statistics {
+    id uuid [pk]
+    fight_id uuid [not null, unique]
+
+    red_strikes int [not null, check: `red_strikes >= 0`, note: "significant strikes landed"]
+    blue_strikes int [not null, check: `blue_strikes >= 0`, note: "significant strikes landed"]
+    red_sig_strikes_attempted int [not null, default: 0, check: `red_sig_strikes_attempted >= 0`]
+    blue_sig_strikes_attempted int [not null, default: 0, check: `blue_sig_strikes_attempted >= 0`]
+    red_total_strikes int [not null, default: 0, check: `red_total_strikes >= 0`, note: "all strikes, not only significant"]
+    blue_total_strikes int [not null, default: 0, check: `blue_total_strikes >= 0`, note: "all strikes, not only significant"]
+
+    red_takedowns int [not null, check: `red_takedowns >= 0`, note: "takedowns landed"]
+    blue_takedowns int [not null, check: `blue_takedowns >= 0`, note: "takedowns landed"]
+    red_takedowns_attempted int [not null, default: 0, check: `red_takedowns_attempted >= 0`]
+    blue_takedowns_attempted int [not null, default: 0, check: `blue_takedowns_attempted >= 0`]
+
+    red_submission_attempts int [not null, check: `red_submission_attempts >= 0`]
+    blue_submission_attempts int [not null, check: `blue_submission_attempts >= 0`]
+    red_reversals int [not null, default: 0, check: `red_reversals >= 0`]
+    blue_reversals int [not null, default: 0, check: `blue_reversals >= 0`]
+
+    red_control_time interval
+    blue_control_time interval
+
+    red_knockdowns int [not null, default: 0, check: `red_knockdowns >= 0`]
+    blue_knockdowns int [not null, default: 0, check: `blue_knockdowns >= 0`]
+
+    red_head_strikes int [not null, default: 0, check: `red_head_strikes >= 0`]
+    blue_head_strikes int [not null, default: 0, check: `blue_head_strikes >= 0`]
+    red_body_strikes int [not null, default: 0, check: `red_body_strikes >= 0`]
+    blue_body_strikes int [not null, default: 0, check: `blue_body_strikes >= 0`]
+    red_leg_strikes int [not null, default: 0, check: `red_leg_strikes >= 0`]
+    blue_leg_strikes int [not null, default: 0, check: `blue_leg_strikes >= 0`]
+
+    red_distance_strikes int [not null, default: 0, check: `red_distance_strikes >= 0`]
+    blue_distance_strikes int [not null, default: 0, check: `blue_distance_strikes >= 0`]
+    red_clinch_strikes int [not null, default: 0, check: `red_clinch_strikes >= 0`]
+    blue_clinch_strikes int [not null, default: 0, check: `blue_clinch_strikes >= 0`]
+    red_ground_strikes int [not null, default: 0, check: `red_ground_strikes >= 0`]
+    blue_ground_strikes int [not null, default: 0, check: `blue_ground_strikes >= 0`]
+}
+Ref: Statistics.fight_id - Fight.id [delete: restrict]
+
+
+Table JudgeScorecard {
+    id uuid [pk]
+    judge_id uuid [not null]
+    fight_id uuid [not null]
+    round int [not null, check: `round >= 1 and round <= 5`]
+    red_corner_fighter_scores int [not null, check: `red_corner_fighter_scores >= 1 and red_corner_fighter_scores <= 10`]
+    blue_corner_fighter_scores int [not null, check: `blue_corner_fighter_scores >= 1 and blue_corner_fighter_scores <= 10`]
+
+    indexes {
+        (judge_id, fight_id, round) [unique]
+    }
+}
+Ref: JudgeScorecard.fight_id > Fight.id [delete: restrict]
+Ref: JudgeScorecard.judge_id > Judge.id [delete: restrict]
